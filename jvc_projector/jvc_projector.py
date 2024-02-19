@@ -89,6 +89,7 @@ class JVCAttributes:  # pylint: disable=too-many-instance-attributes
     software_version: str = ""
     laser_time: int = 0
     lamp_time: int = 0
+    connection_active: bool = False
 
 
 class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
@@ -181,6 +182,10 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
 
     async def open_connection(self) -> bool:
         """Open a connection to the projector asynchronously"""
+        # If the connection is already open, return True
+        if self.writer is not None and not self.writer.is_closing():
+            self.logger.info("Connection already open.")
+            return True
         while True:
             try:
                 self.logger.info(
@@ -203,6 +208,7 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
                     return False
                 self.logger.info("Handshake and connection completed")
                 self.connection_open = True
+                self.attributes.connection_active = True
                 return True
             except asyncio.TimeoutError:
                 self.logger.warning("Connection timed out, retrying in 2 seconds")
@@ -248,13 +254,17 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
             if self.writer:
                 self.writer.close()
                 await self.writer.wait_closed()
-            self.commander.reader = self.reader
-            self.commander.writer = self.writer
-            self.logger.info("Connection closed")
+
+            self.logger.debug("Connection closed")
         except BrokenPipeError:
             self.logger.warning("Connection already closed - Broken pipe encountered")
         except Exception as e:
             self.logger.error("Error closing JVC Projector connection - %s", e)
+        finally:
+            self.commander.reader = self.reader
+            self.commander.writer = self.writer
+            self.connection_open = False
+            self.attributes.connection_active = False
 
     async def info(self) -> tuple[str, bool]:
         """
