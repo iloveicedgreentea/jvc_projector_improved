@@ -169,7 +169,7 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
                     ack=ACKs.model.value,
                 )
             except ConnectionClosedError:
-                self.logger.error("Connection closed")
+                self.logger.warning("Connection closed. Reconnecting")
                 # open connection and try again
                 await self.open_connection()
                 await asyncio.sleep(1)
@@ -241,7 +241,7 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
             try:
                 return await self.commander.send_command(command, command_type)
             except ConnectionClosedError:
-                self.logger.error("Connection closed")
+                self.logger.warning("Connection closed. Reconnecting")
                 # open connection and try again
                 await self.open_connection()
                 await asyncio.sleep(1)
@@ -285,7 +285,7 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
                     command_type=Header.operation.value,
                 )
             except ConnectionClosedError:
-                self.logger.error("Connection closed")
+                self.logger.warning("Connection closed. Reconnecting")
                 # open connection and try again
                 await self.open_connection()
                 await asyncio.sleep(1)
