@@ -114,7 +114,6 @@ class JVCCommander:
                 return await self._do_command(cons_command, ack.value, command_type)
             return "No command provided", False
         except (
-            ConnectionClosedError,
             CommandTimeoutError,
             BlankMessageError,
             ConnectionRefusedError,

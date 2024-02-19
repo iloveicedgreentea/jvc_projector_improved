@@ -41,6 +41,11 @@ from jvc_projector.commands import (
     TheaterOptimizer,
     model_map,
 )
+from jvc_projector.error_classes import (
+    BlankMessageError,
+    CommandTimeoutError,
+    ConnectionClosedError,
+)
 
 
 @dataclass
@@ -154,15 +159,25 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
             + Commands.get_model.value
             + Footer.close.value
         )
-        res, _ = await self.commander.send_command(
-            cmd,
-            command_type=Header.reference.value,
-            ack=ACKs.model.value,
-        )
+        retries = 0
+        while retries < 3:
+            try:
+                res, _ = await self.commander.send_command(
+                    cmd,
+                    command_type=Header.reference.value,
+                    ack=ACKs.model.value,
+                )
+            except ConnectionClosedError:
+                self.logger.error("Connection closed")
+                # open connection and try again
+                await self.open_connection()
+                await asyncio.sleep(1)
+                retries += 1
+                continue
 
-        model_res = self.commander.replace_headers(res).decode()
-        self.logger.debug(model_res)
-        return model_map.get(model_res[-4:], "Unsupported")
+            model_res = self.commander.replace_headers(res).decode()
+            self.logger.debug(model_res)
+            return model_map.get(model_res[-4:], "Unsupported")
 
     async def open_connection(self) -> bool:
         """Open a connection to the projector asynchronously"""
@@ -215,7 +230,17 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
         self.logger.debug(
             "exec_command Executing command: %s - %s", command, command_type
         )
-        return await self.commander.send_command(command, command_type)
+        retries = 0
+        while retries < 3:
+            try:
+                return await self.commander.send_command(command, command_type)
+            except ConnectionClosedError:
+                self.logger.error("Connection closed")
+                # open connection and try again
+                await self.open_connection()
+                await asyncio.sleep(1)
+                retries += 1
+                continue
 
     async def close_connection(self):
         """Close the projector connection asynchronously"""
@@ -241,12 +266,21 @@ class JVCProjectorCoordinator:  # pylint: disable=too-many-public-methods
             + Commands.info.value
             + Footer.close.value
         )
-
-        return await self.commander.send_command(
-            cmd,
-            ack=ACKs.menu_ack,
-            command_type=Header.operation.value,
-        )
+        retries = 0
+        while retries < 3:
+            try:
+                return await self.commander.send_command(
+                    cmd,
+                    ack=ACKs.menu_ack,
+                    command_type=Header.operation.value,
+                )
+            except ConnectionClosedError:
+                self.logger.error("Connection closed")
+                # open connection and try again
+                await self.open_connection()
+                await asyncio.sleep(1)
+                retries += 1
+                continue
 
     async def power_on(
         self,
